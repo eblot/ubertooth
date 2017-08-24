@@ -68,7 +68,7 @@ class RenderArea(QtGui.QWidget):
         self._device = device
         self._frame = None
         self._persisted_frames = None
-        self._persisted_frames_depth = 350
+        self._persisted_frames_depth = 100
         self._path_max = None
 
         self._low_frequency = 2.400e9
@@ -163,37 +163,39 @@ class RenderArea(QtGui.QWidget):
                     pen.setBrush(Qt.red)
                     pen.setStyle(Qt.DotLine)
                     painter.setPen(pen)
-                    painter.drawText(QPointF(x_axis[max_max] + 4, 30), '%.06f' % (self._x_to_hz(x_axis[max_max]) / 1e6))
+                    painter.drawText(QPointF(x_axis[max_max] + 4, 30), self._hz_to_text(self._x_to_hz(x_axis[max_max])))
                     painter.drawText(QPointF(30, y_max[max_max] - 4), '%d' % (self._y_to_dbm(y_max[max_max])))
                     painter.drawLine(QPointF(x_axis[max_max], 0), QPointF(x_axis[max_max], self.height()))
                     painter.drawLine(QPointF(0, y_max[max_max]), QPointF(self.width(), y_max[max_max]))
                     if self._mouse_x:
-                        painter.drawText(QPointF(self._hz_to_x(self._mouse_x) + 4, 58), '(%.06f)' % ((self._x_to_hz(x_axis[max_max]) / 1e6) - (self._mouse_x / 1e6)))
+                        painter.drawText(QPointF(self._hz_to_x(self._mouse_x) + 4, 58), '(%.03f)' % ((self._x_to_hz(x_axis[max_max]) / 1e6) - (self._mouse_x / 1e6)))
                         pen.setBrush(Qt.yellow)
                         painter.setPen(pen)
-                        painter.drawText(QPointF(self._hz_to_x(self._mouse_x) + 4, 44), '%.06f' % (self._mouse_x / 1e6))
+                        painter.drawText(QPointF(self._hz_to_x(self._mouse_x) + 4, 44), self._hz_to_text(self._mouse_x))
                         painter.drawText(QPointF(54, self._dbm_to_y(self._mouse_y) - 4), '%d' % (self._mouse_y))
                         painter.drawLine(QPointF(self._hz_to_x(self._mouse_x), 0), QPointF(self._hz_to_x(self._mouse_x), self.height()))
                         painter.drawLine(QPointF(0, self._dbm_to_y(self._mouse_y)), QPointF(self.width(), self._dbm_to_y(self._mouse_y)))
                         if self._mouse_x2:
-                            painter.drawText(QPointF(self._hz_to_x(self._mouse_x2) + 4, 118), '(%.06f)' % ((self._mouse_x / 1e6) - (self._mouse_x2 / 1e6)))
+                            painter.drawText(QPointF(self._hz_to_x(self._mouse_x2) + 4, 118), '(%.03f)' % ((self._mouse_x / 1e6) - (self._mouse_x2 / 1e6)))
                     if self._mouse_x2:
                         pen.setBrush(Qt.red)
                         painter.setPen(pen)
-                        painter.drawText(QPointF(self._hz_to_x(self._mouse_x2) + 4, 102), '(%.06f)' % ((self._x_to_hz(x_axis[max_max]) / 1e6) - (self._mouse_x2 / 1e6)))
+                        painter.drawText(QPointF(self._hz_to_x(self._mouse_x2) + 4, 102), '(%.03f)' % ((self._x_to_hz(x_axis[max_max]) / 1e6) - (self._mouse_x2 / 1e6)))
                         pen.setBrush(Qt.magenta)
                         painter.setPen(pen)
-                        painter.drawText(QPointF(self._hz_to_x(self._mouse_x2) + 4, 88), '%.06f' % (self._mouse_x2 / 1e6))
+                        painter.drawText(QPointF(self._hz_to_x(self._mouse_x2) + 4, 88), self._hz_to_text(self._mouse_x2))
                         painter.drawText(QPointF(78, self._dbm_to_y(self._mouse_y2) - 4), '%d' % (self._mouse_y2))
                         painter.drawLine(QPointF(self._hz_to_x(self._mouse_x2), 0), QPointF(self._hz_to_x(self._mouse_x2), self.height()))
                         painter.drawLine(QPointF(0, self._dbm_to_y(self._mouse_y2)), QPointF(self.width(), self._dbm_to_y(self._mouse_y2)))
                         if self._mouse_x:
-                            painter.drawText(QPointF(self._hz_to_x(self._mouse_x) + 4, 74), '(%.06f)' % ((self._mouse_x2 / 1e6) - (self._mouse_x / 1e6)))
+                            painter.drawText(QPointF(self._hz_to_x(self._mouse_x) + 4, 74), '(%.03f)' % ((self._mouse_x2 / 1e6) - (self._mouse_x / 1e6)))
         finally:
             painter.end()
 
     def _draw_reticle(self):
         if self._reticle is None or (self._reticle.size() != self.size()):
+            for f in range(2402, 2482, 2):
+                self._hz_to_text(f*1e6)
             self._new_reticle()
 
             dbm_lines = [QLineF(self._hz_to_x(self._low_frequency), self._dbm_to_y(dbm),
@@ -225,7 +227,7 @@ class RenderArea(QtGui.QWidget):
                 for dbm, point in dbm_labels:
                     painter.drawText(point, '%+.0f' % dbm)
                 for frequency, point in frequency_labels:
-                    painter.drawText(point, '%.0f' % (frequency / 1e6))
+                    painter.drawText(point, self._hz_to_text(frequency))
 
             finally:
                 painter.end()
@@ -264,6 +266,22 @@ class RenderArea(QtGui.QWidget):
         tmp = x / self.width()
         delta = tmp * range
         return delta + self._low_frequency
+
+    def _hz_to_text(self, hz):
+        if 2402e6 <= hz <= 2480e6:
+            mhz = int(hz/1e6)
+            channel = (mhz-2402)//2
+            if channel == 0:
+                channel = 37
+            elif channel < 12:
+                channel -= 1
+            elif channel == 12:
+                channel = 38
+            elif channel < 39:
+                channel -= 2
+            return '%2d' % channel
+        else:
+            return ''
 
     def _dbm_to_y(self, dbm):
         delta = self._high_dbm - dbm
@@ -358,6 +376,7 @@ class Window(QtGui.QWidget):
 def sigint_handler(*args):
     """Handler for the SIGINT signal."""
     QtGui.QApplication.quit()
+
 
 if __name__ == '__main__':
     signal.signal(signal.SIGINT, sigint_handler)
